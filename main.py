@@ -1,13 +1,14 @@
 from google import genai
 from google.genai import types
 from google.genai.errors import ClientError
-
+import redis
 from dotenv import load_dotenv
 
 import os
 import time
 
 load_dotenv()
+r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 client = genai.Client(
     api_key=os.getenv("API_KEY")
@@ -53,40 +54,45 @@ User Question:
 
     try:
 
-        response = client.models.generate_content(
+        response = client.models.generate_content_stream(
             model="gemma-4-26b-a4b-it",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system
             )
         )
-
-        text = response.text
+        print(f"\n ai response \n")
+        for chunk in response:
+            if chunk and chunk.text:
+                r.set("res",chunk.text) # using redis lik this wasnot of any help
+                print(r.get("res")) # maybe store the chunk in one variable then loop one 4 letter at a time displaying the response imitating streamming like chatgpt
+        print()
+        # text = response.text
 
         # validate separator
-        if "@#$" not in text:
-            print("Invalid response format from model")
-            continue
+        # if "@#$" not in text:
+        #     print("Invalid response format from model")
+        #     continue
 
-        answer, new_summary = text.split("@#$", 1)
+        # answer, new_summary = text.split("@#$", 1)
 
-        print("\nAI Response:\n")
-        print(answer.strip())
+        # print("\nAI Response:\n")
+        # print(answer.strip())
 
-        cleaned_summary = (
-            new_summary
-            .replace("SUMMARY:", "")
-            .strip()
-        )
+        # cleaned_summary = (
+        #     new_summary
+        #     .replace("SUMMARY:", "")
+        #     .strip()
+        # )
 
         # limit summary size
-        if len(cleaned_summary) > MAX_SUMMARY_LENGTH:
-            cleaned_summary = cleaned_summary[:MAX_SUMMARY_LENGTH]
+        # if len(cleaned_summary) > MAX_SUMMARY_LENGTH:
+        #     cleaned_summary = cleaned_summary[:MAX_SUMMARY_LENGTH]
 
-        summary = cleaned_summary
+        # summary = cleaned_summary
 
-        print("\nUpdated Memory:\n")
-        print(summary)
+        # print("\nUpdated Memory:\n")
+        # print(summary)
 
     except ClientError as e:
 
